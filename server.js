@@ -1,5 +1,6 @@
 const express = require("express");
 const cors = require("cors");
+const path = require("path");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -7,16 +8,16 @@ const PORT = process.env.PORT || 3000;
 app.use(cors());
 app.use(express.json());
 
-// --- Mock data & helpers (demo only) ---
+/* ===============================
+   MOCK DATA (Demo Only)
+================================ */
 
-// Simple mandi prices (₹/kg) and trends
 const MANDI_PRICES = {
   Tomatoes: { price: 20, trend: "stable" },
   Chillies: { price: 80, trend: "rising" },
   Mangoes: { price: 50, trend: "rising" },
 };
 
-// Nearby buyers / storage units (within ~50 km)
 const BUYERS = [
   {
     id: "B1",
@@ -80,31 +81,45 @@ const BUYERS = [
   },
 ];
 
-// Perishability scores (0–1, higher = more perishable)
 const PERISHABILITY = {
   Tomatoes: 0.9,
   Chillies: 0.6,
   Mangoes: 0.7,
 };
 
+/* ===============================
+   HELPER FUNCTIONS
+================================ */
+
 function computeRisk(perishabilityScore, temp, hoursSinceHarvest, hasStorage) {
-  const timeFactor = hoursSinceHarvest < 12 ? 0.2 : hoursSinceHarvest <= 36 ? 0.6 : 1.0;
+  const timeFactor =
+    hoursSinceHarvest < 12 ? 0.2 : hoursSinceHarvest <= 36 ? 0.6 : 1.0;
+
   const tempFactor = temp < 20 ? 0.2 : temp <= 30 ? 0.6 : 1.0;
+
   const storageFactor = hasStorage ? 0.5 : 1.0;
-  const R = 0.5 * perishabilityScore + 0.25 * timeFactor + 0.15 * tempFactor + 0.1 * storageFactor;
+
+  const R =
+    0.5 * perishabilityScore +
+    0.25 * timeFactor +
+    0.15 * tempFactor +
+    0.1 * storageFactor;
+
   if (R < 0.4) return { score: R, label: "Low" };
   if (R < 0.7) return { score: R, label: "Medium" };
   return { score: R, label: "High" };
 }
 
 function pickBestBuyer(crop, maxRadiusKm = 50) {
-  const candidates = BUYERS.filter((b) => (b.crop === crop || b.crop === "ALL") && b.distanceKm <= maxRadiusKm);
+  const candidates = BUYERS.filter(
+    (b) => (b.crop === crop || b.crop === "ALL") && b.distanceKm <= maxRadiusKm
+  );
+
   if (!candidates.length) return null;
 
-  // Prefer closer and higher price; small composite score
   const scored = candidates.map((b) => {
     const priceScore = b.pricePerKg || 0;
-    const distanceScore = -b.distanceKm; // closer is better
+    const distanceScore = -b.distanceKm;
     return { ...b, _score: priceScore * 1.5 + distanceScore * 0.5 };
   });
 
@@ -112,35 +127,20 @@ function pickBestBuyer(crop, maxRadiusKm = 50) {
   return scored[0];
 }
 
-// In-memory booking log for demo
 const bookings = [];
 
-// --- Routes ---
+/* ===============================
+   API ROUTES
+================================ */
 
-// Health check
 app.get("/api/health", (req, res) => {
   res.json({ status: "ok", service: "harvestlink-backend" });
 });
 
-// Nearby vendors (buyers + storage) listing
 app.get("/api/vendors", (req, res) => {
-  res.json({
-    vendors: BUYERS.map((b) => ({
-      id: b.id,
-      name: b.name,
-      crop: b.crop,
-      pricePerKg: b.pricePerKg,
-      distanceKm: b.distanceKm,
-      type: b.type,
-      locationName: b.locationName,
-      contactPhone: b.contactPhone,
-      lat: b.lat,
-      lng: b.lng,
-    })),
-  });
+  res.json({ vendors: BUYERS });
 });
 
-// Recommendation endpoint
 app.post("/api/recommendation", (req, res) => {
   const {
     crop,
@@ -159,72 +159,60 @@ app.post("/api/recommendation", (req, res) => {
   const mandiPrice = mandiInfo.price;
 
   const bestBuyer = pickBestBuyer(crop);
-  const buyerPrice = bestBuyer && bestBuyer.pricePerKg ? bestBuyer.pricePerKg : mandiPrice * 0.85;
-  const buyerDistance = typeof distanceKm === "number" && !Number.isNaN(distanceKm)
-    ? distanceKm
-    : bestBuyer
+
+  const buyerPrice =
+    bestBuyer && bestBuyer.pricePerKg
+      ? bestBuyer.pricePerKg
+      : mandiPrice * 0.85;
+
+  const buyerDistance =
+    typeof distanceKm === "number" && !Number.isNaN(distanceKm)
+      ? distanceKm
+      : bestBuyer
       ? bestBuyer.distanceKm
       : 15;
 
   const perishabilityScore = PERISHABILITY[crop] ?? 0.7;
-  const risk = computeRisk(perishabilityScore, tempC ?? 30, hoursSinceHarvest, hasStorage);
+
+  const risk = computeRisk(
+    perishabilityScore,
+    tempC ?? 30,
+    hoursSinceHarvest,
+    hasStorage
+  );
 
   let action = "SELL";
-  let explanation;
+  let explanation = "";
 
-  if (risk.label === "High" && buyerPrice >= 0.85 * mandiPrice && buyerDistance <= 10) {
+  if (risk.label === "High") {
     action = "SELL";
-    explanation =
-      "High spoilage risk, buyer price is close to mandi and within 10 km → recommend immediate sale.";
-  } else if (buyerPrice >= mandiPrice && buyerDistance <= 20) {
+    explanation = "High spoilage risk → sell immediately.";
+  } else if (buyerPrice >= mandiPrice) {
     action = "SELL";
-    explanation =
-      "Buyer price is equal or better than mandi and reasonably close → sell now.";
-  } else if (buyerPrice < 0.75 * mandiPrice && hasStorage && risk.label !== "High") {
-    action = "STORE";
-    explanation =
-      "Buyer price is low but spoilage risk not extreme and storage is available → store instead of distress sale.";
-  } else if (risk.label === "Low" && mandiInfo.trend === "rising") {
-    action = "WAIT_1_DAY";
-    explanation =
-      "Spoilage risk is low and mandi trend is rising → safe to wait one more day.";
+    explanation = "Buyer price is equal or better than mandi.";
   } else if (risk.label === "Low") {
     action = "WAIT_1_DAY";
-    explanation = "Spoilage risk is low → safe to wait for better demand for one more day.";
+    explanation = "Low spoilage risk → safe to wait.";
   } else {
-    action = "SELL";
-    explanation =
-      "To avoid loss from spoilage, nearest buyer is still the safest option.";
+    action = "STORE";
+    explanation = "Moderate risk and low price → store if possible.";
   }
-
-  const estimatedRevenue = Math.round(buyerPrice * quantityKg);
-  const distanceLabel = buyerDistance <= 10 ? "≤ 10 km (preferred)" : `${buyerDistance} km`;
 
   res.json({
     crop,
     quantityKg,
     mandiPrice,
     mandiTrend: mandiInfo.trend,
-    buyer: bestBuyer
-      ? {
-          id: bestBuyer.id,
-          name: bestBuyer.name,
-          pricePerKg: bestBuyer.pricePerKg,
-          distanceKm: bestBuyer.distanceKm,
-          type: bestBuyer.type,
-        }
-      : null,
+    buyer: bestBuyer,
     buyerPrice,
     buyerDistance,
     risk,
     action,
     explanation,
-    estimatedRevenue,
-    distanceLabel,
+    estimatedRevenue: Math.round(buyerPrice * quantityKg),
   });
 });
 
-// Booking endpoint (demo only)
 app.post("/api/booking", (req, res) => {
   const { farmer, crop, quantityKg, action, buyer } = req.body || {};
 
@@ -233,6 +221,7 @@ app.post("/api/booking", (req, res) => {
   }
 
   const id = `BK-${String(bookings.length + 1).padStart(4, "0")}`;
+
   const record = {
     id,
     farmer,
@@ -244,16 +233,29 @@ app.post("/api/booking", (req, res) => {
   };
 
   bookings.push(record);
-  console.log("New booking:", record);
 
   res.json({
     status: "confirmed",
     bookingId: id,
-    message: "Booking recorded (demo). In production this would trigger WhatsApp/SMS.",
   });
 });
 
-app.listen(PORT, () => {
-  console.log(`HarvestLink backend running on http://localhost:${PORT}`);
+/* ===============================
+   FRONTEND SERVING (IMPORTANT)
+================================ */
+
+// Serve static files (index.html, css, js)
+app.use(express.static(path.join(__dirname)));
+
+// Serve homepage
+app.get("/", (req, res) => {
+  res.sendFile(path.join(__dirname, "index.html"));
 });
 
+/* ===============================
+   START SERVER
+================================ */
+
+app.listen(PORT, () => {
+  console.log(`HarvestLink running on port ${PORT}`);
+});
