@@ -1,0 +1,1555 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>HarvestLink – Post-Harvest Assistant</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link
+    rel="stylesheet"
+    href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+    integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+    crossorigin=""
+  />
+  <script
+    src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+    integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+    crossorigin=""
+  ></script>
+  <style>
+    :root {
+      --bg: #f3f4f6;
+      --bg-card: #ffffff;
+      --accent: #0f766e;
+      --accent-soft: rgba(15, 118, 110, 0.08);
+      --accent-strong: #0f766e;
+      --text-main: #111827;
+      --text-muted: #6b7280;
+      --border-subtle: rgba(209, 213, 219, 0.9);
+      --danger: #b91c1c;
+      --warning: #ca8a04;
+      --info: #2563eb;
+      --shadow-soft: 0 16px 35px rgba(15, 23, 42, 0.08);
+      --radius-xl: 14px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background:
+        radial-gradient(circle at top left, rgba(59, 130, 246, 0.14), transparent 55%),
+        radial-gradient(circle at bottom right, rgba(16, 185, 129, 0.12), transparent 55%),
+        var(--bg);
+      color: var(--text-main);
+      min-height: 100vh;
+      display: flex;
+      align-items: stretch;
+      justify-content: center;
+    }
+
+    .app-shell {
+      width: 100%;
+      max-width: 1100px;
+      margin: 18px;
+      display: grid;
+      grid-template-columns: minmax(0, 3fr) minmax(0, 2.4fr);
+      gap: 18px;
+    }
+
+    @media (max-width: 900px) {
+      .app-shell {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .card {
+      background: linear-gradient(145deg, #ffffff, #f9fafb);
+      border-radius: var(--radius-xl);
+      border: 1px solid var(--border-subtle);
+      box-shadow: var(--shadow-soft);
+      padding: 18px 20px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: "";
+      position: absolute;
+      inset: -80px;
+      opacity: 0.3;
+      background:
+        radial-gradient(circle at 0 0, rgba(59, 130, 246, 0.14) 0, transparent 55%),
+        radial-gradient(circle at 100% 100%, rgba(34, 197, 94, 0.12) 0, transparent 55%);
+      pointer-events: none;
+    }
+
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 12px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .title {
+      font-size: 1rem;
+      font-weight: 600;
+      letter-spacing: 0.02em;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      background: rgba(16, 185, 129, 0.08);
+      border: 1px solid rgba(16, 185, 129, 0.35);
+      color: #047857;
+    }
+
+    .pill-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: #22c55e;
+      box-shadow: 0 0 0 5px rgba(34, 197, 94, 0.35);
+    }
+
+    .subtitle {
+      font-size: 0.9rem;
+      color: var(--text-muted);
+      margin-bottom: 16px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .chips-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 10px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .chip {
+      padding: 3px 10px;
+      border-radius: 999px;
+      font-size: 0.7rem;
+      background: #eef2ff;
+      border: 1px solid rgba(191, 219, 254, 0.9);
+      color: #1e40af;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .chip-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #38bdf8;
+    }
+
+    .mic-panel {
+      position: relative;
+      z-index: 1;
+      margin-top: 12px;
+      border-radius: 16px;
+      border: 1px solid rgba(209, 213, 219, 0.9);
+      background: radial-gradient(circle at top, rgba(56, 189, 248, 0.16), transparent 55%);
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .mic-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+    }
+
+    .mic-info {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+
+    .mic-caption {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+    }
+
+    .wave-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 3px 8px;
+      border-radius: 999px;
+      background: rgba(15, 23, 42, 0.85);
+      border: 1px solid rgba(148, 163, 184, 0.4);
+      font-size: 0.7rem;
+      color: #e5e7eb;
+    }
+
+    .wave {
+      display: flex;
+      gap: 2px;
+    }
+    .wave span {
+      display: block;
+      width: 2px;
+      height: 9px;
+      border-radius: 999px;
+      background: linear-gradient(to top, #4ade80, #22c55e);
+      animation: pulse 1s ease-in-out infinite;
+    }
+    .wave span:nth-child(2) { animation-delay: 0.12s; }
+    .wave span:nth-child(3) { animation-delay: 0.24s; }
+    .wave span:nth-child(4) { animation-delay: 0.36s; }
+    .wave span:nth-child(5) { animation-delay: 0.48s; }
+
+    @keyframes pulse {
+      0%, 100% { transform: scaleY(0.4); opacity: 0.5; }
+      50% { transform: scaleY(1); opacity: 1; }
+    }
+
+    .mic-btn {
+      position: relative;
+      padding: 0;
+      width: 64px;
+      height: 64px;
+      border-radius: 999px;
+      border: none;
+      background: radial-gradient(circle at 30% 0, #f97316 0, #fb923c 35%, #f97316 70%);
+      color: white;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+      box-shadow: 0 10px 24px rgba(248, 113, 22, 0.25);
+      transition: transform 0.1s ease, box-shadow 0.1s ease, filter 0.1s ease;
+    }
+    .mic-btn::before {
+      content: "";
+      position: absolute;
+      inset: -8px;
+      border-radius: inherit;
+      background: radial-gradient(circle, rgba(248, 113, 22, 0.4), transparent 65%);
+      opacity: 0.6;
+      z-index: -1;
+    }
+    .mic-btn:active {
+      transform: translateY(1px) scale(0.97);
+      box-shadow: 0 6px 14px rgba(15, 23, 42, 0.9);
+      filter: brightness(0.96);
+    }
+    .mic-icon {
+      width: 24px;
+      height: 24px;
+    }
+
+    .input-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+      position: relative;
+      z-index: 1;
+    }
+    @media (max-width: 600px) {
+      .input-grid {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .field label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: var(--text-muted);
+    }
+
+    .field input,
+    .field select {
+      border-radius: 999px;
+      border: 1px solid rgba(209, 213, 219, 0.95);
+      background: #ffffff;
+      color: var(--text-main);
+      padding: 7px 12px;
+      font-size: 0.86rem;
+      outline: none;
+    }
+    .field input:focus,
+    .field select:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.4);
+    }
+
+    .primary-btn {
+      margin-top: 12px;
+      width: 100%;
+      border-radius: 999px;
+      border: none;
+      padding: 9px 14px;
+      font-size: 0.9rem;
+      font-weight: 500;
+      background: linear-gradient(120deg, #16a34a, #22c55e);
+      color: #ecfdf3;
+      cursor: pointer;
+      box-shadow: 0 10px 25px rgba(22, 163, 74, 0.25);
+      transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.1s ease;
+    }
+    .primary-btn:active {
+      transform: translateY(1px);
+      box-shadow: 0 5px 12px rgba(15, 23, 42, 0.9);
+      filter: brightness(0.97);
+    }
+
+    .small-note {
+      margin-top: 4px;
+      font-size: 0.72rem;
+      color: #6b7280;
+    }
+
+    /* Right column */
+    .stack {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    .section-label {
+      font-size: 0.78rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: #6b7280;
+      margin-bottom: 4px;
+    }
+
+    .parsed-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .parsed-item {
+      background: #f9fafb;
+      border-radius: 10px;
+      padding: 6px 8px;
+      border: 1px solid rgba(209, 213, 219, 0.9);
+      font-size: 0.78rem;
+    }
+
+    .parsed-label {
+      color: #9ca3af;
+      font-size: 0.7rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      margin-bottom: 2px;
+    }
+
+    .parsed-value {
+      color: #111827;
+      font-weight: 500;
+    }
+
+    .badge-row {
+      display: flex;
+      gap: 6px;
+      margin: 6px 0;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(209, 213, 219, 0.9);
+      font-size: 0.7rem;
+      color: #111827;
+      background: #f9fafb;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .badge span.dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: #22c55e;
+    }
+
+    .vendor-list {
+      margin-top: 6px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      max-height: 150px;
+      overflow-y: auto;
+    }
+
+    .vendor-item {
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 8px;
+      padding: 6px 8px;
+      border-radius: 10px;
+      border: 1px solid rgba(209, 213, 219, 0.9);
+      background: #f9fafb;
+      font-size: 0.78rem;
+    }
+
+    .vendor-main {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .vendor-name {
+      font-weight: 600;
+      color: #111827;
+    }
+
+    .vendor-meta {
+      color: #6b7280;
+      font-size: 0.72rem;
+    }
+
+    .vendor-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 2px;
+    }
+
+    .vendor-tag {
+      padding: 1px 6px;
+      border-radius: 999px;
+      border: 1px solid rgba(209, 213, 219, 0.9);
+      background: #eef2ff;
+      font-size: 0.68rem;
+      color: #1e40af;
+    }
+
+    .vendor-contact {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 4px;
+      min-width: 110px;
+    }
+
+    .vendor-phone {
+      font-size: 0.75rem;
+      color: #111827;
+    }
+
+    .vendor-call-link {
+      border-radius: 999px;
+      border: 1px solid rgba(34, 197, 94, 0.8);
+      padding: 3px 8px;
+      font-size: 0.7rem;
+      background: radial-gradient(circle at top, rgba(34, 197, 94, 0.12), #ecfdf5);
+      color: #166534;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+
+    .vendor-map {
+      margin-top: 8px;
+      height: 190px;
+      border-radius: 12px;
+      border: 1px solid rgba(209, 213, 219, 0.9);
+      overflow: hidden;
+    }
+
+    .result-main {
+      margin-top: 4px;
+      padding: 8px 10px;
+      border-radius: 12px;
+      background: linear-gradient(135deg, var(--accent-soft), #e0f2fe);
+      border: 1px solid rgba(59, 130, 246, 0.28);
+      font-size: 0.9rem;
+      color: #1d4ed8;
+    }
+
+    .metrics-row {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .metric {
+      border-radius: 10px;
+      border: 1px solid rgba(209, 213, 219, 0.9);
+      background: #ffffff;
+      padding: 6px 7px;
+      font-size: 0.76rem;
+    }
+    .metric-label {
+      color: #9ca3af;
+      font-size: 0.7rem;
+      margin-bottom: 2px;
+    }
+
+    .metric-value {
+      font-weight: 600;
+      color: #111827;
+    }
+
+    .risk-tag {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 0.75rem;
+      padding: 3px 7px;
+      border-radius: 999px;
+      background: rgba(248, 250, 252, 0.02);
+      border: 1px solid rgba(252, 211, 77, 0.7);
+      color: #facc15;
+    }
+
+    .risk-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: #facc15;
+      box-shadow: 0 0 0 4px rgba(250, 204, 21, 0.35);
+    }
+
+    .booking-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      margin-top: 8px;
+    }
+
+    .booking-note {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .booking-btn {
+      border-radius: 999px;
+      border: none;
+      padding: 6px 12px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      background: linear-gradient(120deg, #22c55e, #16a34a);
+      color: #022c22;
+      cursor: pointer;
+      white-space: nowrap;
+      box-shadow: 0 6px 18px rgba(16, 185, 129, 0.4);
+      transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.1s ease;
+    }
+    .booking-btn:active {
+      transform: translateY(1px);
+      box-shadow: 0 4px 10px rgba(15, 23, 42, 0.9);
+      filter: brightness(0.97);
+    }
+
+    .log {
+      margin-top: 8px;
+      padding: 7px 9px;
+      border-radius: 10px;
+      background: #f9fafb;
+      border: 1px dashed rgba(209, 213, 219, 0.9);
+      font-size: 0.72rem;
+      color: #6b7280;
+      max-height: 120px;
+      overflow-y: auto;
+    }
+
+    .log strong {
+      color: #111827;
+    }
+
+    /* Government portal styling */
+    .gov-shell {
+      width: 100%;
+      max-width: 1200px;
+      margin: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .gov-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 10px 16px;
+      border-radius: 14px;
+      background: linear-gradient(90deg, #ffffff, #e5f3ff);
+      border: 1px solid rgba(209, 213, 219, 0.9);
+      box-shadow: 0 10px 25px rgba(15, 23, 42, 0.1);
+    }
+
+    .gov-header-left {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .gov-logo {
+      width: 38px;
+      height: 38px;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.9);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: radial-gradient(circle at 30% 0, #f97316 0, #facc15 60%, #b45309 100%);
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #111827;
+    }
+
+    .gov-brand {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+
+    .gov-brand-main {
+      font-size: 0.86rem;
+      font-weight: 600;
+      letter-spacing: 0.06em;
+      text-transform: uppercase;
+    }
+
+    .gov-brand-sub {
+      font-size: 0.75rem;
+      color: #6b7280;
+    }
+
+    .gov-header-right {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 0.75rem;
+      color: #4b5563;
+    }
+
+    .gov-flag-pill {
+      display: inline-flex;
+      overflow: hidden;
+      border-radius: 999px;
+      border: 1px solid rgba(148, 163, 184, 0.7);
+    }
+    .gov-flag-band {
+      width: 10px;
+      height: 14px;
+    }
+    .gov-flag-band:nth-child(1) { background: #f97316; }
+    .gov-flag-band:nth-child(2) { background: #f9fafb; }
+    .gov-flag-band:nth-child(3) { background: #16a34a; }
+
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 999px;
+      background: #22c55e;
+      box-shadow: 0 0 0 4px rgba(34, 197, 94, 0.35);
+    }
+
+    .gov-main {
+      display: grid;
+      grid-template-columns: minmax(0, 2.2fr) minmax(0, 2.8fr);
+      gap: 16px;
+    }
+
+    @media (max-width: 900px) {
+      .gov-main {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .login-card {
+      background: linear-gradient(145deg, #ffffff, #f9fafb);
+      border-radius: var(--radius-xl);
+      border: 1px solid var(--border-subtle);
+      box-shadow: var(--shadow-soft);
+      padding: 20px 22px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .login-card::before {
+      content: "";
+      position: absolute;
+      inset: -80px;
+      opacity: 0.06;
+      background:
+        radial-gradient(circle at 0 0, #38bdf8 0, transparent 55%),
+        radial-gradient(circle at 100% 100%, #22c55e 0, transparent 55%);
+      pointer-events: none;
+    }
+
+    .login-title {
+      position: relative;
+      z-index: 1;
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 4px;
+    }
+
+    .login-subtitle {
+      position: relative;
+      z-index: 1;
+      font-size: 0.84rem;
+      color: #6b7280;
+      margin-bottom: 14px;
+    }
+
+    .login-badge-row {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-bottom: 10px;
+    }
+
+    .login-badge {
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(209, 213, 219, 0.9);
+      font-size: 0.7rem;
+      color: #111827;
+      background: #f9fafb;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .login-form {
+      position: relative;
+      z-index: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 4px;
+    }
+
+    .login-row-2 {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 8px;
+    }
+
+    @media (max-width: 600px) {
+      .login-row-2 {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .inline-field {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .inline-field label {
+      font-size: 0.72rem;
+      text-transform: uppercase;
+      letter-spacing: 0.09em;
+      color: var(--text-muted);
+    }
+
+    .inline-field input {
+      border-radius: 999px;
+      border: 1px solid rgba(209, 213, 219, 0.95);
+      background: #ffffff;
+      color: var(--text-main);
+      padding: 7px 12px;
+      font-size: 0.86rem;
+      outline: none;
+    }
+
+    .inline-field input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 1px rgba(74, 222, 128, 0.4);
+    }
+
+    .otp-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+      gap: 8px;
+      margin-top: 4px;
+    }
+
+    @media (max-width: 600px) {
+      .otp-row {
+        grid-template-columns: minmax(0, 1fr);
+      }
+    }
+
+    .secondary-btn {
+      border-radius: 999px;
+      border: 1px solid rgba(37, 99, 235, 0.8);
+      padding: 8px 12px;
+      font-size: 0.82rem;
+      font-weight: 500;
+      background: radial-gradient(circle at top, rgba(59, 130, 246, 0.12), #eff6ff);
+      color: #1d4ed8;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: transform 0.08s ease, box-shadow 0.08s ease, filter 0.1s ease;
+      box-shadow: 0 8px 18px rgba(30, 64, 175, 0.22);
+    }
+
+    .secondary-btn:active {
+      transform: translateY(1px);
+      box-shadow: 0 4px 10px rgba(15, 23, 42, 0.9);
+      filter: brightness(0.97);
+    }
+
+    .login-footer {
+      margin-top: 6px;
+      font-size: 0.72rem;
+      color: #6b7280;
+    }
+
+    .login-footer strong {
+      color: #111827;
+    }
+
+    .hidden {
+      display: none !important;
+    }
+
+    .farmer-summary {
+      font-size: 0.8rem;
+      color: #6b7280;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .farmer-chip {
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid rgba(209, 213, 219, 0.9);
+      font-size: 0.72rem;
+      color: #111827;
+      background: #eff6ff;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .farmer-chip span.dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 999px;
+      background: #22c55e;
+    }
+  </style>
+</head>
+<body>
+  <div class="gov-shell">
+    <header class="gov-header">
+      <div class="gov-header-left">
+        <div class="gov-logo">
+          <span>भारत</span>
+        </div>
+        <div class="gov-brand">
+          <div class="gov-brand-main">Ministry of Agriculture & Farmers Welfare</div>
+          <div class="gov-brand-sub">Government of India · HarvestLink Decision Support Portal</div>
+        </div>
+      </div>
+      <div class="gov-header-right">
+        <div class="gov-flag-pill" aria-hidden="true">
+          <div class="gov-flag-band"></div>
+          <div class="gov-flag-band"></div>
+          <div class="gov-flag-band"></div>
+        </div>
+        <span>Secure Farmer Login</span>
+        <span class="status-dot"></span>
+      </div>
+    </header>
+
+    <!-- LOGIN VIEW -->
+    <div id="loginView" class="gov-main">
+      <div class="login-card">
+        <div class="login-title">Farmer Login (Kisan Seva)</div>
+        <div class="login-subtitle">
+          Enter your details as per Aadhaar and registered mobile. An OTP will be sent for secure access to post‑harvest advisory.
+        </div>
+
+        <div class="login-badge-row">
+          <div class="login-badge">
+            <span class="status-dot" style="width:6px;height:6px;box-shadow:none;"></span>
+            Integrated with Digital Agriculture Stack (demo)
+          </div>
+          <div class="login-badge">
+            <span class="status-dot" style="width:6px;height:6px;box-shadow:none;background:#3b82f6;"></span>
+            Vernacular voice decision engine
+          </div>
+        </div>
+
+        <form class="login-form" onsubmit="return false;">
+          <div class="inline-field">
+            <label for="farmerName">Farmer Name</label>
+            <input id="farmerName" type="text" placeholder="As per Aadhaar" autocomplete="off" />
+          </div>
+
+          <div class="login-row-2">
+            <div class="inline-field">
+              <label for="aadhaar">Aadhaar Number</label>
+              <input id="aadhaar" type="text" maxlength="12" inputmode="numeric" placeholder="12‑digit Aadhaar" />
+            </div>
+            <div class="inline-field">
+              <label for="phone">Mobile Number</label>
+              <input id="phone" type="text" maxlength="10" inputmode="tel" placeholder="10‑digit mobile" />
+            </div>
+          </div>
+
+          <div class="otp-row">
+            <div class="inline-field">
+              <label for="otp">OTP</label>
+              <input id="otp" type="text" maxlength="4" inputmode="numeric" placeholder="Enter 4‑digit OTP" />
+            </div>
+            <button id="sendOtpBtn" class="secondary-btn" type="button">
+              Send OTP
+            </button>
+          </div>
+
+          <button id="verifyBtn" class="primary-btn" type="button">
+            Verify & Continue to HarvestLink
+          </button>
+
+          <div class="login-footer">
+            <strong>Note:</strong> For this demo, OTP is generated on screen instead of SMS, to show the government‑style flow in a single browser.
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <div class="section-label">About HarvestLink</div>
+        <div class="subtitle" style="margin-bottom: 10px;">
+          Government‑backed AI assistant to help farmers decide whether to <strong>sell, store, or wait</strong> at the moment of harvest,
+          reducing post‑harvest loss and distress sales.
+        </div>
+        <div class="chips-row">
+          <span class="chip"><span class="chip-dot"></span> Integrated mandi price view (Agmarknet)</span>
+          <span class="chip">Nearby buyers & cold storage (≤ 10 km prioritised)</span>
+          <span class="chip">Spoilage‑aware decision rules</span>
+          <span class="chip">Vernacular voice + SMS summary</span>
+        </div>
+        <div class="result-main" style="margin-top: 10px;">
+          After login, the portal shows a live demo of how a farmer’s voice input is converted into a decision:
+          recommended buyer or storage, expected revenue, and spoilage risk level – all within a few seconds.
+        </div>
+      </div>
+    </div>
+
+    <!-- APP VIEW (after login) -->
+    <div id="appView" class="gov-main hidden">
+      <!-- LEFT: Farmer interaction -->
+      <div class="card">
+        <div class="card-header">
+          <div class="title">
+            HarvestLink Decision Console
+            <span class="pill">
+              <span class="pill-dot"></span>
+              Live Demo · Vernacular AI
+            </span>
+          </div>
+          <div class="farmer-summary" id="farmerSummary">
+            <!-- Filled by JS -->
+          </div>
+        </div>
+        <div class="subtitle">
+          Voice‑first assistant that helps a farmer decide whether to sell, store, or wait the moment crops are harvested.
+        </div>
+
+        <div class="chips-row">
+          <span class="chip"><span class="chip-dot"></span> Post‑harvest loss reduction</span>
+          <span class="chip">≤ 10 km prioritised</span>
+          <span class="chip">Agmarknet + local buyers</span>
+          <span class="chip">Spoilage‑aware decisions</span>
+        </div>
+
+        <div class="mic-panel">
+          <div class="mic-row">
+            <div class="mic-info">
+              <div class="mic-caption">Farmer speaks in local language</div>
+              <div class="wave-pill">
+                <div class="wave">
+                  <span></span><span></span><span></span><span></span><span></span>
+                </div>
+                “I harvested 200 kg tomatoes today…”
+              </div>
+            </div>
+            <button class="mic-btn" id="micBtn" type="button">
+              <svg class="mic-icon" viewBox="0 0 24 24" fill="none">
+                <rect x="9" y="3" width="6" height="10" rx="3" fill="white" />
+                <path d="M5 11a1 1 0 0 0 2 0V10" stroke="white" stroke-width="1.5" stroke-linecap="round" />
+                <path d="M17 11a1 1 0 0 1-2 0V10" stroke="white" stroke-width="1.5" stroke-linecap="round" />
+                <path d="M8 15a4 4 0 0 0 8 0" stroke="white" stroke-width="1.5" stroke-linecap="round" />
+                <path d="M12 19v2" stroke="white" stroke-width="1.5" stroke-linecap="round" />
+                <path d="M9.5 21h5" stroke="white" stroke-width="1.5" stroke-linecap="round" />
+              </svg>
+            </button>
+          </div>
+          <div class="small-note">
+            For this demo, clicking the mic fills a sample utterance and runs the decision engine locally. In production, this would call
+            Bhashini STT + backend services.
+          </div>
+
+          <div class="input-grid">
+            <div class="field">
+              <label for="crop">Crop</label>
+              <select id="crop">
+                <option value="Tomatoes">Tomatoes</option>
+                <option value="Chillies">Chillies</option>
+                <option value="Mangoes">Mangoes</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="qty">Quantity (kg)</label>
+              <input id="qty" type="number" value="200" min="10" />
+            </div>
+            <div class="field">
+              <label for="distance">Nearest buyer distance (km)</label>
+              <input id="distance" type="number" value="8" min="1" />
+            </div>
+            <div class="field">
+              <label for="temp">Temperature (°C)</label>
+              <input id="temp" type="number" value="32" min="10" max="50" />
+            </div>
+          </div>
+
+          <button class="primary-btn" id="recommendBtn" type="button">
+            Run HarvestLink Recommendation
+          </button>
+        </div>
+      </div>
+
+      <!-- RIGHT: Parsed info & recommendation -->
+      <div class="stack">
+        <div class="card">
+          <div class="section-label">What the AI understands</div>
+          <div class="subtitle" style="margin-bottom: 8px;">
+            Speech is converted to text (via Bhashini) and then key entities are extracted.
+          </div>
+
+          <div class="parsed-grid" id="parsedGrid">
+            <!-- Filled by JS -->
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="section-label">Decision engine output</div>
+          <div class="subtitle" style="margin-bottom: 6px;">
+            Combines mandi prices, nearby buyers, storage, and spoilage risk into a single, actionable recommendation.
+          </div>
+
+          <div class="badge-row">
+            <div class="badge">
+              <span class="dot"></span>
+              Agmarknet mandi price visibility
+            </div>
+            <div class="badge">
+              <span class="dot" style="background:#3b82f6;"></span>
+              Cold storage awareness
+            </div>
+            <div class="badge">
+              <span class="dot" style="background:#facc15;"></span>
+              Spoilage risk engine
+            </div>
+          </div>
+
+          <div class="result-main" id="resultText">
+            Press “Run HarvestLink Recommendation” to see a suggestion.
+          </div>
+
+          <div class="metrics-row" id="metricsRow">
+            <!-- Filled by JS -->
+          </div>
+
+          <div style="margin-top: 8px;">
+            <span class="risk-tag" id="riskTag" style="display:none;">
+              <span class="risk-dot"></span>
+              Risk:
+              <span id="riskLabel"></span>
+            </span>
+          </div>
+
+          <div class="booking-row">
+            <div class="booking-note">
+              Once the farmer taps Confirm, HarvestLink sends a WhatsApp / SMS to the buyer and logs the booking.
+            </div>
+            <button class="booking-btn" id="bookingBtn" type="button">
+              Confirm Booking
+            </button>
+          </div>
+
+          <div class="log" id="log">
+            <strong>System log:</strong> Please login to start a session.
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="section-label">Nearby buyers & storage</div>
+          <div class="subtitle" style="margin-bottom: 6px;">
+            Shows verified buyers and cold storage units within ~50 km. &lt; 10 km distance is prioritised in decisions.
+          </div>
+          <div class="vendor-list" id="vendorList">
+            <!-- Filled by JS -->
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="section-label">Map view of vendors</div>
+          <div class="subtitle" style="margin-bottom: 6px;">
+            Visual map of nearby buyers and cold storage based on the selected crop.
+          </div>
+          <div class="vendor-map" id="vendorMap"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Backend base URL (adjust if you host elsewhere)
+    const API_BASE = "http://localhost:3000/api";
+
+    // Login and OTP flow (demo)
+    const loginView = document.getElementById('loginView');
+    const appView = document.getElementById('appView');
+    const farmerNameInput = document.getElementById('farmerName');
+    const aadhaarInput = document.getElementById('aadhaar');
+    const phoneInput = document.getElementById('phone');
+    const otpInput = document.getElementById('otp');
+    const sendOtpBtn = document.getElementById('sendOtpBtn');
+    const verifyBtn = document.getElementById('verifyBtn');
+    const farmerSummary = document.getElementById('farmerSummary');
+
+    const micBtn = document.getElementById('micBtn');
+    const recommendBtn = document.getElementById('recommendBtn');
+    const bookingBtn = document.getElementById('bookingBtn');
+    const parsedGrid = document.getElementById('parsedGrid');
+    const resultText = document.getElementById('resultText');
+    const metricsRow = document.getElementById('metricsRow');
+    const logEl = document.getElementById('log');
+    const riskTag = document.getElementById('riskTag');
+    const riskLabel = document.getElementById('riskLabel');
+    const vendorListEl = document.getElementById('vendorList');
+    const vendorMapEl = document.getElementById('vendorMap');
+
+    const cropEl = document.getElementById('crop');
+    const qtyEl = document.getElementById('qty');
+    const distanceEl = document.getElementById('distance');
+    const tempEl = document.getElementById('temp');
+
+    let currentOtp = null;
+    let currentFarmer = null;
+    let allVendors = [];
+    let vendorMap = null;
+    let vendorMapLayer = null;
+
+    function appendLog(msg, type = "info") {
+      const now = new Date().toLocaleTimeString();
+      const color =
+        type === "error" ? "#b91c1c" :
+        type === "success" ? "#166534" :
+        "#4b5563";
+      logEl.innerHTML += `<br><span style="color:#9ca3af;">[${now}]</span> <span style="color:${color};">${msg}</span>`;
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
+    function maskAadhaar(aadhaar) {
+      if (!aadhaar || aadhaar.length < 4) return '—';
+      return 'XXXX-XXXX-' + aadhaar.slice(-4);
+    }
+
+    function formatPhone(phone) {
+      if (!phone) return '—';
+      return '+91 ' + phone.replace(/\D/g, '').replace(/(\d{5})(\d{5})/, '$1 $2');
+    }
+
+    function getVendorsForCurrentCrop() {
+      const crop = cropEl.value;
+      return (allVendors || [])
+        .filter(v => !v.crop || v.crop === crop)
+        .sort((a, b) => (a.distanceKm || 0) - (b.distanceKm || 0));
+    }
+
+    async function loadVendors() {
+      if (!vendorListEl) return;
+      try {
+        const res = await fetch(`${API_BASE}/vendors`);
+        if (!res.ok) throw new Error(`Backend error (${res.status})`);
+        const data = await res.json();
+        allVendors = data.vendors || [];
+        renderVendors();
+        updateVendorMap();
+      } catch (err) {
+        console.error(err);
+        appendLog(`Could not load vendor list from backend. ${err.message}`, "error");
+      }
+    }
+
+    function renderVendors() {
+      if (!vendorListEl) return;
+      const vendorsForCrop = getVendorsForCurrentCrop();
+
+      if (!vendorsForCrop.length) {
+        vendorListEl.innerHTML = '<div class="vendor-meta">No vendors configured for this crop in the demo dataset.</div>';
+        return;
+      }
+
+      vendorListEl.innerHTML = vendorsForCrop.map(v => {
+        const distanceLabel = v.distanceKm <= 10
+          ? '≤ 10 km (preferred)'
+          : `${v.distanceKm} km`;
+        const typeLabel = v.type === 'storage' ? 'Cold storage' : v.type === 'processor' ? 'Processor' : 'Trader';
+        const safePhone = v.contactPhone || '';
+        const telHref = safePhone.replace(/\s+/g, '');
+        return `
+          <div class="vendor-item">
+            <div class="vendor-main">
+              <div class="vendor-name">${v.name}</div>
+              <div class="vendor-meta">${v.locationName || ''}</div>
+              <div class="vendor-tags">
+                <span class="vendor-tag">${typeLabel}</span>
+                <span class="vendor-tag">${distanceLabel}</span>
+              </div>
+            </div>
+            <div class="vendor-contact">
+              <div class="vendor-phone">${safePhone}</div>
+              ${safePhone ? `<a class="vendor-call-link" href="tel:${telHref}">Call</a>` : ''}
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function updateVendorMap() {
+      if (!vendorMapEl || typeof L === "undefined") return;
+      const vendorsForCrop = getVendorsForCurrentCrop().filter(v => typeof v.lat === "number" && typeof v.lng === "number");
+
+      if (!vendorMap) {
+        const defaultCenter = vendorsForCrop.length
+          ? [vendorsForCrop[0].lat, vendorsForCrop[0].lng]
+          : [21.15, 79.09];
+        vendorMap = L.map(vendorMapEl, {
+          attributionControl: false,
+          zoomControl: true,
+        }).setView(defaultCenter, 11);
+
+        L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+          maxZoom: 18,
+        }).addTo(vendorMap);
+
+        vendorMapLayer = L.layerGroup().addTo(vendorMap);
+      }
+
+      if (!vendorMapLayer) return;
+
+      vendorMapLayer.clearLayers();
+
+      if (!vendorsForCrop.length) return;
+
+      const bounds = [];
+      vendorsForCrop.forEach(v => {
+        const marker = L.marker([v.lat, v.lng]).addTo(vendorMapLayer);
+        const typeLabel = v.type === 'storage' ? 'Cold storage' : v.type === 'processor' ? 'Processor' : 'Trader';
+        marker.bindPopup(
+          `<strong>${v.name}</strong><br>${v.locationName || ''}<br>${v.distanceKm} km · ${typeLabel}`
+        );
+        bounds.push([v.lat, v.lng]);
+      });
+
+      if (bounds.length) {
+        vendorMap.fitBounds(bounds, { padding: [20, 20] });
+      }
+    }
+
+    sendOtpBtn.addEventListener('click', () => {
+      const phone = phoneInput.value.trim();
+      if (phone.length !== 10) {
+        alert('Please enter a valid 10-digit mobile number.');
+        return;
+      }
+      currentOtp = String(Math.floor(1000 + Math.random() * 9000));
+      otpInput.value = currentOtp; // demo convenience
+      appendLog(`OTP generated (demo only): ${currentOtp} for mobile ${formatPhone(phone)}.`, "success");
+      alert(`Demo OTP (normally sent via SMS): ${currentOtp}`);
+    });
+
+    verifyBtn.addEventListener('click', () => {
+      const name = farmerNameInput.value.trim();
+      const aadhaar = aadhaarInput.value.trim();
+      const phone = phoneInput.value.trim();
+      const enteredOtp = otpInput.value.trim();
+
+      if (!name || aadhaar.length !== 12 || phone.length !== 10) {
+        alert('Please fill name, 12-digit Aadhaar, and 10-digit mobile number.');
+        return;
+      }
+      if (!currentOtp) {
+        alert('Please click "Send OTP" first.');
+        return;
+      }
+      if (enteredOtp !== currentOtp) {
+        alert('Invalid OTP. Please check and try again.');
+        return;
+      }
+
+      currentFarmer = { name, aadhaar, phone };
+      loginView.classList.add('hidden');
+      appView.classList.remove('hidden');
+
+      farmerSummary.innerHTML = `
+        <div class="farmer-chip">
+          <span class="dot"></span>
+          ${name}
+        </div>
+        <div class="farmer-chip">
+          Aadhaar: ${maskAadhaar(aadhaar)}
+        </div>
+        <div class="farmer-chip">
+          Mobile: ${formatPhone(phone)}
+        </div>
+      `;
+
+      appendLog('Farmer authenticated via Aadhaar-linked OTP (demo). Session started for: ' + name + '.', "success");
+      loadVendors();
+      runDecision(); // initial decision from backend
+    });
+
+    function computeRisk(perishabilityScore, temp, hoursSinceHarvest) {
+      let timeFactor = hoursSinceHarvest < 12 ? 0.2 : hoursSinceHarvest <= 36 ? 0.6 : 1.0;
+      let tempFactor = temp < 20 ? 0.2 : temp <= 30 ? 0.6 : 1.0;
+      const R = 0.5 * perishabilityScore + 0.3 * timeFactor + 0.2 * tempFactor;
+      if (R < 0.4) return { score: R, label: "Low" };
+      if (R < 0.7) return { score: R, label: "Medium" };
+      return { score: R, label: "High" };
+    }
+
+    async function runDecision() {
+      const crop = cropEl.value;
+      const qty = Number(qtyEl.value || 0);
+      const distance = Number(distanceEl.value || 0);
+      const temp = Number(tempEl.value || 30);
+
+      if (!qty || qty <= 0) {
+        alert('Please enter a valid quantity in kg.');
+        return;
+      }
+
+      recommendBtn.disabled = true;
+      recommendBtn.textContent = "Running recommendation...";
+
+      try {
+        const response = await fetch(`${API_BASE}/recommendation`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({
+            crop,
+            quantityKg: qty,
+            distanceKm: distance,
+            tempC: temp
+          })
+        });
+
+        if (!response.ok) {
+          throw new Error(`Backend error (${response.status})`);
+        }
+
+        const data = await response.json();
+
+        const mandiPrice = data.mandiPrice;
+        const buyerPrice = data.buyerPrice;
+        const buyerDistance = data.buyerDistance;
+        const action = data.action;
+        const explanation = data.explanation;
+        const risk = data.risk;
+
+      // Update parsed entities UI
+      parsedGrid.innerHTML = `
+        <div class="parsed-item">
+          <div class="parsed-label">Crop</div>
+          <div class="parsed-value">${crop}</div>
+        </div>
+        <div class="parsed-item">
+          <div class="parsed-label">Quantity</div>
+          <div class="parsed-value">${qty || "–"} kg</div>
+        </div>
+        <div class="parsed-item">
+          <div class="parsed-label">Farmer distance to buyer</div>
+          <div class="parsed-value">${buyerDistance || distance || "–"} km</div>
+        </div>
+        <div class="parsed-item">
+          <div class="parsed-label">Ambient temp</div>
+          <div class="parsed-value">${temp} °C</div>
+        </div>
+        <div class="parsed-item">
+          <div class="parsed-label">Mandi price</div>
+          <div class="parsed-value">₹${mandiPrice}/kg</div>
+        </div>
+        <div class="parsed-item">
+          <div class="parsed-label">Buyer offer</div>
+          <div class="parsed-value">₹${buyerPrice}/kg</div>
+        </div>
+      `;
+
+      // Main recommendation text
+      if (action === "SELL") {
+        const buyerName = data.buyer?.name || "nearest verified buyer";
+        resultText.textContent =
+          `Best option is ${buyerName} at ₹${buyerPrice}/kg located ${buyerDistance} km away. ` +
+          `Govt mandi price is ₹${mandiPrice}/kg. ${explanation}`;
+      } else if (action === "STORE") {
+        resultText.textContent =
+          `Recommend sending to nearest cold storage (within 10–15 km). ` +
+          `Current buyer offer is only ₹${buyerPrice}/kg vs mandi ₹${mandiPrice}/kg. ${explanation}`;
+      } else {
+        resultText.textContent =
+          `Safe to wait 1 more day before selling. ` +
+          `Spoilage risk is ${risk.label.toLowerCase()} and mandi price trend is assumed rising. ${explanation}`;
+      }
+
+      // Metrics row
+      metricsRow.innerHTML = `
+        <div class="metric">
+          <div class="metric-label">Action</div>
+          <div class="metric-value">
+            ${action === "SELL" ? "Sell today" : action === "STORE" ? "Store" : "Wait 1 day"}
+          </div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Farmer revenue (est.)</div>
+          <div class="metric-value">₹${(buyerPrice * qty).toLocaleString("en-IN")}</div>
+        </div>
+        <div class="metric">
+          <div class="metric-label">Distance prioritised</div>
+          <div class="metric-value">
+            ${buyerDistance <= 10 ? "≤ 10 km (preferred)" : `${buyerDistance} km`}
+          </div>
+        </div>
+      `;
+
+      // Risk chip
+      riskTag.style.display = 'inline-flex';
+      riskLabel.textContent = `${risk.label} (score ${risk.score.toFixed(2)})`;
+
+      appendLog(
+        `Decision engine (backend): action=${action}, risk=${risk.label}, mandi=₹${mandiPrice}/kg, buyer=₹${buyerPrice}/kg, distance=${buyerDistance} km`,
+        "success"
+      );
+    } catch (err) {
+      console.error(err);
+      appendLog(`Failed to get recommendation from backend. ${err.message}`, "error");
+      alert("Could not reach backend recommendation service. Please ensure the server is running.");
+    } finally {
+      recommendBtn.disabled = false;
+      recommendBtn.textContent = "Run HarvestLink Recommendation";
+    }
+    }
+
+    if (micBtn) {
+      micBtn.addEventListener('click', () => {
+        cropEl.value = "Tomatoes";
+        qtyEl.value = 200;
+        distanceEl.value = 8;
+        tempEl.value = 32;
+        appendLog("Simulated STT: “I harvested 200 kg tomatoes today near my village.”");
+        runDecision();
+        renderVendors();
+        updateVendorMap();
+      });
+    }
+
+    if (recommendBtn) {
+      recommendBtn.addEventListener('click', () => {
+        runDecision();
+        renderVendors();
+        updateVendorMap();
+      });
+    }
+
+    if (cropEl) {
+      cropEl.addEventListener('change', () => {
+        renderVendors();
+        updateVendorMap();
+      });
+    }
+
+    if (bookingBtn) {
+      bookingBtn.addEventListener('click', async () => {
+        if (!currentFarmer) {
+          alert('Please login as a farmer first.');
+          return;
+        }
+
+        bookingBtn.disabled = true;
+        bookingBtn.textContent = "Confirming...";
+
+        try {
+          const crop = cropEl.value;
+          const qty = Number(qtyEl.value || 0);
+          const response = await fetch(`${API_BASE}/booking`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              farmer: currentFarmer,
+              crop,
+              quantityKg: qty,
+              action: resultText.textContent || "UNKNOWN",
+              buyer: null // could be populated from last recommendation if stored
+            })
+          });
+
+          if (!response.ok) {
+            throw new Error(`Backend error (${response.status})`);
+          }
+
+          const data = await response.json();
+          appendLog(`Booking confirmed: ${data.bookingId}. WhatsApp/SMS would be sent (demo).`, "success");
+          alert("Booking confirmed (demo). In production, this triggers WhatsApp/SMS + booking log.");
+        } catch (err) {
+          console.error(err);
+          appendLog(`Booking failed. ${err.message}`, "error");
+          alert("Booking failed. Please ensure the backend is running.");
+        } finally {
+          bookingBtn.disabled = false;
+          bookingBtn.textContent = "Confirm Booking";
+        }
+      });
+    }
+  </script>
+</body>
+</html>
